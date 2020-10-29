@@ -1,0 +1,71 @@
+domain ip {
+	table filter {
+		chain FORWARD {
+			jump DOCKER-USER;
+			jump DOCKER-ISOLATION-STAGE-1;
+			{% for network in networks if network.driver == "bridge" -%}
+			outerface {{ network.ifname }} mod state state (ESTABLISHED RELATED) ACCEPT;
+			outerface {{ network.ifname }} jump DOCKER;
+			interface {{ network.ifname }} outerface ! {{ network.ifname }} ACCEPT;
+			interface {{ network.ifname }} outerface {{ network.ifname }} ACCEPT;
+			{% endfor %}
+		}
+
+		chain DOCKER {
+			{% for container in containers -%}
+			{%- for mapping in container.port_mappings -%}
+			daddr {{ container.ip }}/32 interface ! {{ container.network.ifname }} outerface {{ container.network.ifname }} proto {{ mapping.proto }} dport {{ mapping.internal_port }} ACCEPT;
+			{% endfor -%}
+			{% endfor %}
+		}
+
+		chain DOCKER-ISOLATION-STAGE-1 {
+			{% for network in networks -%}
+			interface {{ network.ifname }} outerface ! {{ network.ifname }} jump DOCKER-ISOLATION-STAGE-2;
+			{% endfor %}
+			jump RETURN;
+		}
+
+		chain DOCKER-ISOLATION-STAGE-2 {
+			{% for network in networks -%}
+			outerface {{ network.ifname }} jump DROP;
+			{% endfor %}
+			jump RETURN;
+		}
+
+		chain DOCKER-USER {
+			jump RETURN;
+		}
+	}
+
+	table nat {
+		chain DOCKER {
+			{% for network in networks if network.driver == "bridge" -%}
+			interface {{ network.ifname }} jump RETURN;
+			{% endfor -%}
+			{%- for container in containers -%}
+			{%- for mapping in container.port_mappings -%}
+			interface ! {{ container.network.ifname }} proto {{ mapping.proto }} dport {{ mapping.external_port }} DNAT to {{ container.ip }}:{{ mapping.internal_port }};
+			{% endfor -%}
+			{%- endfor %}
+		}
+
+		chain PREROUTING {
+			policy ACCEPT;
+			mod addrtype dst-type LOCAL jump DOCKER;
+		}
+
+		chain OUTPUT {
+			policy ACCEPT;
+			daddr ! 127.0.0.0/8 mod addrtype dst-type LOCAL jump DOCKER;
+		}
+
+		chain POSTROUTING {
+			policy ACCEPT;
+			{% for network in networks if network.driver == "bridge" -%}
+			outerface ! {{ network.ifname }} saddr {{ network.prefix }} MASQUERADE;
+			{% endfor %}
+		}
+
+	}
+}
