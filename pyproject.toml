@@ -1,9 +1,16 @@
 [tool.poetry]
 name = "ferm-docker"
 version = "0.1.0"
-description = "Automatically generate ferm firewall configurations for a local docker instance"
+description = "Automatically generate ferm firewall configuration for a local Docker instance"
 authors = ["Martin Weinelt"]
 license = "GPL-2.0-only"
+readme = "README.rst"
+homepage = "https://github.com/mweinelt/ferm-docker"
+repository = "https://github.com/mweinelt/ferm-docker"
+keywords = ["docker", "ferm"]
+include = [
+    "LICENSE",
+]
 
 [tool.poetry.scripts]
 ferm-docker = "ferm_docker:main"
