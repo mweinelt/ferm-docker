@@ -20,14 +20,14 @@ domain ip {
 		}
 
 		chain DOCKER-ISOLATION-STAGE-1 {
-			{% for network in networks -%}
+			{% for network in networks if network.driver == "bridge" -%}
 			interface {{ network.ifname }} outerface ! {{ network.ifname }} jump DOCKER-ISOLATION-STAGE-2;
 			{% endfor %}
 			jump RETURN;
 		}
 
 		chain DOCKER-ISOLATION-STAGE-2 {
-			{% for network in networks -%}
+			{% for network in networks if network.driver == "bridge" -%}
 			outerface {{ network.ifname }} jump DROP;
 			{% endfor %}
 			jump RETURN;
