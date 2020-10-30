@@ -1,11 +1,12 @@
 [tool.poetry]
 name = "ferm-docker"
 version = "0.1.0"
-description = ""
+description = "Automatically generate ferm firewall configurations for a local docker instance"
 authors = ["Martin Weinelt"]
+license = "GPL-2.0-only"
 
 [tool.poetry.scripts]
-ferm_docker = "ferm_docker:main"
+ferm-docker = "ferm_docker:main"
 
 [tool.poetry.dependencies]
 python = "^3.6"
