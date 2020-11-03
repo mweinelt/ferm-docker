@@ -2,40 +2,61 @@ domain ip {
 	table filter {
 		chain FORWARD {
 			jump DOCKER-USER;
+			{% if swarm -%}
+			jump DOCKER-INGRESS;
+			{% else -%}
 			jump DOCKER-ISOLATION-STAGE-1;
+			{% endif -%}
 			{% for network in networks if network.driver == "bridge" -%}
 			outerface {{ network.ifname }} mod conntrack ctstate (ESTABLISHED RELATED) ACCEPT;
+			{% if not swarm -%}
 			outerface {{ network.ifname }} jump DOCKER;
+			{% endif -%}
 			interface {{ network.ifname }} outerface ! {{ network.ifname }} ACCEPT;
 			interface {{ network.ifname }} outerface {{ network.ifname }} ACCEPT;
-			{% endfor %}
+			{%- endfor %}
 		}
 
 		chain DOCKER {
+			{% if not swarm -%}
 			{% for container in containers -%}
-			{%- for mapping in container.port_mappings -%}
-			daddr {{ container.ip }}/32 interface ! {{ container.network.ifname }} outerface {{ container.network.ifname }} proto {{ mapping.proto }} dport {{ mapping.internal_port }} ACCEPT;
+			{% for mapping in container.port_mappings -%}
+			{% for network in container.ingress_networks -%}
+			daddr {{ container.ip }}/32 interface ! {{ network.ifname }} outerface {{ network.ifname }} proto {{ mapping.proto }} dport {{ mapping.internal_port }} ACCEPT;
 			{% endfor -%}
-			{% endfor %}
-		}
-
-		chain DOCKER-ISOLATION-STAGE-1 {
-			{% for network in networks if network.driver == "bridge" -%}
-			interface {{ network.ifname }} outerface ! {{ network.ifname }} jump DOCKER-ISOLATION-STAGE-2;
-			{% endfor %}
-			jump RETURN;
-		}
-
-		chain DOCKER-ISOLATION-STAGE-2 {
-			{% for network in networks if network.driver == "bridge" -%}
-			outerface {{ network.ifname }} jump DROP;
-			{% endfor %}
-			jump RETURN;
+			{% endfor -%}
+			{% endfor -%}
+			{%- endif %}
 		}
 
 		chain DOCKER-USER {
 			jump RETURN;
 		}
+		{% if swarm %}
+		chain DOCKER-INGRESS {
+			{% for container in containers -%}
+			{% for mapping in container.port_mappings -%}
+			proto {{ mapping.proto }} dport {{ mapping.external_port }} ACCEPT;
+			proto {{ mapping.proot }} sport {{ mapping.external_port }} mod state state (ESTABLISHED RELATED) ACCEPT;
+			{% endfor -%}
+			{% endfor -%}
+			jump RETURN;
+		}
+		{% else %}
+		chain DOCKER-ISOLATION-STAGE-1 {
+			{% for network in networks if network.driver == "bridge" or network.ingress -%}
+			interface {{ network.ifname }} outerface ! {{ network.ifname }} jump DOCKER-ISOLATION-STAGE-2;
+			{% endfor -%}
+			jump RETURN;
+		}
+
+		chain DOCKER-ISOLATION-STAGE-2 {
+			{% for network in networks if network.driver == "bridge" or network.ingress -%}
+			outerface {{ network.ifname }} jump DROP;
+			{% endfor -%}
+			jump RETURN;
+		}
+		{% endif %}
 	}
 
 	table nat {
@@ -43,27 +64,50 @@ domain ip {
 			{% for network in networks if network.driver == "bridge" -%}
 			interface {{ network.ifname }} jump RETURN;
 			{% endfor -%}
-			{%- for container in containers -%}
-			{%- for mapping in container.port_mappings -%}
-			interface ! {{ container.network.ifname }} proto {{ mapping.proto }} dport {{ mapping.external_port }} DNAT to {{ container.ip }}:{{ mapping.internal_port }};
+			{% for container in containers -%}
+			{% for mapping in container.port_mappings -%}
+			{% for network in container.ingress_networks -%}
+			interface ! {{ network.ifname }} proto {{ mapping.proto }} dport {{ mapping.external_port }} DNAT to {{ container.ip }}:{{ mapping.internal_port }};
+			{% endfor -%}
 			{% endfor -%}
 			{%- endfor %}
 		}
-
+		{% if swarm -%}
+		chain DOCKER-INGRESS {
+			{%- for container in containers -%}
+			{% for mapping in container.port_mappings -%}
+			proto {{ mapping.proto }} dport {{ mapping.external_port }} DNAT to {{ container.ip }}:{{ mapping.internal_port }};
+			{% endfor -%}
+			{% endfor -%}
+			jump RETURN;
+		}
+		{% endif %}
 		chain PREROUTING {
 			policy ACCEPT;
+			{% if swarm -%}
+			mod addrtype dst-type LOCAL jump DOCKER-INGRESS;
+			{% else -%}
 			mod addrtype dst-type LOCAL jump DOCKER;
+			{%- endif %}
 		}
 
 		chain OUTPUT {
 			policy ACCEPT;
+			{% if swarm -%}
+			mod addrtype dst-type LOCAL jump DOCKER-INGRESS;
+			{% else -%}
 			daddr ! 127.0.0.0/8 mod addrtype dst-type LOCAL jump DOCKER;
+			{%- endif %}
 		}
 
 		chain POSTROUTING {
 			policy ACCEPT;
-			{% for network in networks if network.driver == "bridge" -%}
+			{% for network in networks if network.ip_masquerade -%}
+			{% if network.prefix -%}
 			outerface ! {{ network.ifname }} saddr {{ network.prefix }} MASQUERADE;
+			{% else -%}
+			outerface {{ network.ifname }} mod addrtype src-type LOCAL MASQUERADE
+			{% endif -%}
 			{% endfor -%}
 			{%- for container in containers -%}
 			{%- for mapping in container.port_mappings -%}
@@ -71,6 +115,5 @@ domain ip {
 			{% endfor -%}
 			{%- endfor %}
 		}
-
 	}
 }
