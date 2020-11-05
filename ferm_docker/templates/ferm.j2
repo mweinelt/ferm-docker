@@ -64,7 +64,12 @@ domain ip {
 			policy ACCEPT;
 			{% for network in networks if network.driver == "bridge" -%}
 			outerface ! {{ network.ifname }} saddr {{ network.prefix }} MASQUERADE;
-			{% endfor %}
+			{% endfor -%}
+			{%- for container in containers -%}
+			{%- for mapping in container.port_mappings -%}
+			saddr {{ container.ip }} daddr {{ container.ip }} proto {{ mapping.proto }} dport {{ mapping.external_port }} MASQUERADE;
+			{% endfor -%}
+			{%- endfor %}
 		}
 
 	}
