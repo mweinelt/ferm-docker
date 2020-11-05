@@ -3,7 +3,7 @@ import json
 from jinja2 import Environment, PackageLoader
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 client = docker.APIClient()
 
