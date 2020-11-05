@@ -4,7 +4,7 @@ domain ip {
 			jump DOCKER-USER;
 			jump DOCKER-ISOLATION-STAGE-1;
 			{% for network in networks if network.driver == "bridge" -%}
-			outerface {{ network.ifname }} mod state state (ESTABLISHED RELATED) ACCEPT;
+			outerface {{ network.ifname }} mod conntrack ctstate (ESTABLISHED RELATED) ACCEPT;
 			outerface {{ network.ifname }} jump DOCKER;
 			interface {{ network.ifname }} outerface ! {{ network.ifname }} ACCEPT;
 			interface {{ network.ifname }} outerface {{ network.ifname }} ACCEPT;
