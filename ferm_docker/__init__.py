@@ -74,7 +74,7 @@ class Network:
         if not ipam_config:
             return False
 
-        return ipam_config.pop()["Subnet"]
+        return ipam_config[0]["Subnet"]
 
     def inspect(self):
         return client.inspect_network(self.id)
@@ -171,7 +171,8 @@ class Container:
                     )[0]
                 )
 
-        return addrs.pop()
+        # TODO: this is too naïve, it should return the matching address for the network
+        return addrs[0]
 
     @property
     def port_mappings(self):
