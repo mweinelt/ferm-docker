@@ -7,7 +7,7 @@ domain ip {
 			{% else -%}
 			jump DOCKER-ISOLATION-STAGE-1;
 			{% endif -%}
-			{% for network in networks if network.driver == "bridge" -%}
+			{% for network in networks if network.driver == "bridge" %}
 			outerface {{ network.ifname }} mod conntrack ctstate (ESTABLISHED RELATED) ACCEPT;
 			{% if not swarm -%}
 			outerface {{ network.ifname }} jump DOCKER;
