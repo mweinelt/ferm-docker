@@ -1,5 +1,6 @@
 import docker
 import json
+import sys
 from jinja2 import Environment, PackageLoader
 
 
@@ -91,6 +92,11 @@ class Container:
 
 
 def main():
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "dump":
+            dump()
+            sys.exit(0)
+
     env = Environment(
          loader=PackageLoader('ferm_docker')
     )
@@ -101,6 +107,15 @@ def main():
         containers=list(map(Container, client.containers())),
         networks=list(map(Network, client.networks()))
     ))
+
+
+def dump():
+    for response in [
+            client.containers(),
+            client.networks()]:
+        print(json.dumps(response, indent=2))
+
+
 
 if __name__ == '__main__':
     main()
