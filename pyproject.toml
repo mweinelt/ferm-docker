@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ferm-docker"
-version = "0.1.2"
+version = "0.1.3"
 description = "Automatically generate ferm firewall configuration for a local Docker instance"
 authors = ["Martin Weinelt"]
 license = "GPL-2.0-only"
