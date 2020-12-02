@@ -6,7 +6,10 @@ from jinja2 import Environment, PackageLoader
 
 __version__ = "0.1.3"
 
-client = docker.APIClient()
+try:
+    client = docker.APIClient()
+except docker.errors.DockerException:
+    client = None
 
 
 def get_nested(dct: dict, *keys: list):
@@ -187,6 +190,10 @@ class Container:
 
 
 def main():
+    if not client:
+        print("Docker API not reachable, doing nothing", file=sys.stderr)
+        sys.exit(0)
+
     if len(sys.argv) > 1:
         if sys.argv[1] == "dump":
             dump()
