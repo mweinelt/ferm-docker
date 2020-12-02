@@ -4,7 +4,7 @@ import sys
 from jinja2 import Environment, PackageLoader
 
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 try:
     client = docker.APIClient()
